@@ -1,0 +1,61 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: sqlite:////data/vidforge.db
+      STORAGE_DIR: /storage
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/storage
+      - backend_data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ./backend
+    command: celery -A app.workers.celery_app.celery_app worker --loglevel=INFO --pool=solo
+    env_file: .env
+    environment:
+      DATABASE_URL: sqlite:////data/vidforge.db
+      STORAGE_DIR: /storage
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./storage:/storage
+      - backend_data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  redis_data:
+  backend_data:

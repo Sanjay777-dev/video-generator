@@ -1,0 +1,6 @@
+# Optional override for hosts with NVIDIA Container Toolkit installed.
+services:
+  backend:
+    gpus: all
+  worker:
+    gpus: all
